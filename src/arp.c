@@ -14,7 +14,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <features.h> /* GLIBC VERSION */
-#include <trace.h>
+#include <arp_trace.h>
 #include <errno.h>
 #if __GLIBC__ >= 2 && __GLIBC_MINOR >= 1
 #include <netpacket/packet.h>
@@ -48,16 +48,54 @@ int get_ip_addr(struct in_addr* in_addr, char* str)
 	return 0;
 }
 
+int create_arp_sock()
+{
+	int sock,res;
+	struct mac_addr mac;
+	struct sockaddr_ll myAddr;
+
+	sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_RARP|ETH_P_ARP));
+	if(sock<0){
+		error("create arp socket error!!\n");
+		return -1;
+	}
+	get_host_mac(DEFAULT_DEVICE,&mac);
+	bzero(&myAddr,sizeof(myAddr));
+	myAddr.sll_family = AF_PACKET;
+	myAddr.sll_protocol=htons(ETH_P_ARP);
+	myAddr.sll_hatype=ARPHRD_ETHER;
+	myAddr.sll_pkttype=PACKET_HOST;
+	myAddr.sll_halen=ETH_ALEN;
+	myAddr.sll_ifindex = if_nametoindex(DEFAULT_DEVICE);
+	memcpy(myAddr.sll_addr,&mac,ETH_HW_ADDR_LEN);
+
+	res = bind(sock,(struct sockaddr *)&myAddr,sizeof(myAddr));
+	if(res<0){
+		close(sock);
+		return -1;
+	}
+	return sock;
+}
+
+int destory_arp_sock(int sock)
+{
+	if(sock<0)
+		return -1;
+	return close(sock);
+}
 
 int send_arp(int sock,struct arp_package* arp_op,const char* devName)
 {
 	int res;
-	struct sockaddr sa;
+	struct sockaddr_ll to;
+
+	bzero(&to,sizeof(to));
+	to.sll_family = PF_PACKET;
+	to.sll_ifindex = if_nametoindex(DEFAULT_DEVICE);
 	if(!devName || !arp_op){
 		return -1;
 	}
-	strcpy(sa.sa_data, devName);
-	res = sendto(sock, arp_op, sizeof(struct arp_package), 0, &sa, sizeof(sa));
+	res = sendto(sock, arp_op, sizeof(struct arp_package), 0, (struct sockaddr*)&to, sizeof(to));
 	if(res<0) {
 		error("Send ARP Failed via DEV [%s]\n",devName);
 		return -1;
@@ -287,7 +325,6 @@ int get_mac_from_ip(const struct in_addr* ipaddr,struct mac_addr* mac)
 	if( res == 0)
 		return 0;
 
-	trace("Hello\n");
 	/* Here Send a Arp to get Mac addr!! */
 	return get_mac_from_arp(ipaddr,mac);
 }

@@ -13,8 +13,8 @@
 #define __TRACE_ARP_HEADER_FILE__
 
 
-#define trace(fmt...) fprintf(stdout,"File:[%s] Line:[%d]## TRACE: %s",__FILE__,__LINE__,##fmt)
-#define error(fmt...) fprintf(stdout,"File:[%s] Line:[%d]## TRACE: %s",__FILE__,__LINE__,##fmt)
+#define trace(fmt,...) fprintf(stdout,"File:[%s] Line:[%d]## TRACE:" fmt,__FILE__,__LINE__,##__VA_ARGS__)
+#define error(fmt,...) fprintf(stdout,"File:[%s] Line:[%d]## TRACE:" fmt,__FILE__,__LINE__,##__VA_ARGS__)
 
 #endif
 

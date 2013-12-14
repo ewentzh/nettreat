@@ -91,5 +91,7 @@ extern int get_host_mac(const char* devName,struct mac_addr* mac);
 extern int get_host_ip(const char* devName,struct in_addr* ipaddr);
 extern int get_mac_from_ip(const struct in_addr* ipaddr,struct mac_addr* mac);
 extern void dump_arp(struct arp_package * arp_op);
+extern int create_arp_sock();
+extern int destory_arp_sock(int sock);
 
 #endif
