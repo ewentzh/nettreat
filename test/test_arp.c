@@ -12,7 +12,7 @@
 #include <stdio.h>
 
 
-int test_get_mac_from_ip(struct ip_addr* ipaddr)
+int test_get_mac_from_ip(char* ipaddr)
 {
 	struct mac_addr ma;
 	struct in_addr ip;
