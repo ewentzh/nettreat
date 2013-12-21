@@ -23,6 +23,8 @@
 
 #define ASSERT(cond) assert(cond)
 
+extern int test_list();
+
 
 enum{
 	TREAT_TYPE_KILL=1,
@@ -245,6 +247,12 @@ int main(int argc,char* argv[])
 	int res;
 	pthread_t thread_id;
 	struct in_addr gtIp,treat_ip;
+//#define TEST
+#ifdef TEST
+	test_list();
+	test_fifo();
+	return 0;
+#endif
 
 	inet_aton(argv[1], &gtIp);
 	inet_aton(argv[2], &treat_ip);
